@@ -28,7 +28,11 @@ License URI: http://www.gnu.org/licenses/gpl-3.0.html
             
             add_action( 'admin_menu', array( $this, 'AddSettingsPage' ) );
             
-            add_action( $this->placement, array( $this, 'RenderRecaptcha' ) );
+            if( $this->comment_form != 'false' )
+            {
+                add_action( $this->placement, array( $this, 'RenderRecaptcha' ) );
+                add_filter( 'preprocess_comment', array( $this, 'VerifyCommentRecaptcha' ) );
+            }
             
             if( $this->registration_form != 'false' )
             {
@@ -40,7 +44,6 @@ License URI: http://www.gnu.org/licenses/gpl-3.0.html
             }
             add_action( 'wp_head', array( $this, 'AddRecaptchaSnippet' ) );
             add_action( 'wp_enqueue_scripts', array( $this, 'AddRecaptchaScript' ) );
-            add_filter( 'preprocess_comment', array( $this, 'VerifyCommentRecaptcha' ) );
         }
         
         function TestRegistrationForm()
@@ -127,6 +130,17 @@ License URI: http://www.gnu.org/licenses/gpl-3.0.html
                                         Comment Form
                                     </h3> 
                                 </th>
+                            </tr>
+                            <tr valign="top">
+                                <th scope="row">
+                                    <label for="herc_recaptcha_options[registration_form]">
+                                        Show on Comment Form
+                                    </label>
+                                </th>
+                                <td>
+                                    <input type="hidden" name="herc_recaptcha_options[comment_form]" value="false" />
+                                    <input type="checkbox" name="herc_recaptcha_options[comment_form]" value="true" <?php echo $this->comment_form == 'false' ? '' : 'checked="checked"'; ?> />
+                                </td>
                             </tr>
                             <tr valign="top">
                                 <th scope="row">
@@ -243,12 +257,14 @@ License URI: http://www.gnu.org/licenses/gpl-3.0.html
             $placement  = !empty( $herc_recaptcha_options['placement'] ) ? $herc_recaptcha_options['placement'] : 'comment_form_after_fields';
             $style      = !empty( $herc_recaptcha_options['style'] ) ? $herc_recaptcha_options['style'] : 'dark';
             $registration_form = !empty( $herc_recaptcha_options['registration_form'] ) ? $herc_recaptcha_options['registration_form'] : 'true';
+            $comment_form = !empty( $herc_recaptcha_options['comment_form'] ) ? $herc_recaptcha_options['comment_form'] : 'true';
 
             $this->public_recaptcha_key = $publickey;
             $this->private_recaptcha_key = $privatekey;
             $this->placement = $placement;
             $this->style = $style;
             $this->registration_form = $registration_form;
+            $this->comment_form = $comment_form;
         }
 
         /**
