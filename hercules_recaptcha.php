@@ -24,17 +24,28 @@ License URI: http://www.gnu.org/licenses/gpl-3.0.html
         {
 
             $this->SetRecaptchaKeys();
-
             $current_theme = get_current_theme();
             
             add_action( 'admin_menu', array( $this, 'AddSettingsPage' ) );
             
             add_action( $this->placement, array( $this, 'RenderRecaptcha' ) );
-
-
+            
+            if( $this->registration_form != 'false' )
+            {
+                add_action( 'signup_extra_fields', array( $this, 'RenderRecaptcha' ) );
+                if( is_multisite() )
+                    add_filter( 'wpmu_validate_user_signup', array( $this, 'VerifyRegistrationRecaptcha' ) );
+                else
+                    add_filter( 'registration_errors', array( $this, 'VerifyRegistrationRecaptcha' ) );
+            }
             add_action( 'wp_head', array( $this, 'AddRecaptchaSnippet' ) );
             add_action( 'wp_enqueue_scripts', array( $this, 'AddRecaptchaScript' ) );
             add_filter( 'preprocess_comment', array( $this, 'VerifyCommentRecaptcha' ) );
+        }
+        
+        function TestRegistrationForm()
+        {
+            echo 'i am right here!!!!!!!!!!!!';
         }
         
         /**
@@ -111,6 +122,13 @@ License URI: http://www.gnu.org/licenses/gpl-3.0.html
                                 </td>
                             </tr>
                             <tr valign="top">
+                                <th colspan="2" scope="row">
+                                    <h3>
+                                        Comment Form
+                                    </h3> 
+                                </th>
+                            </tr>
+                            <tr valign="top">
                                 <th scope="row">
                                     <label for="herc_recaptcha_options[placement]">
                                         Location: 
@@ -127,6 +145,24 @@ License URI: http://www.gnu.org/licenses/gpl-3.0.html
                                         }
                                         ?>
                                     </select>
+                                </td>
+                            </tr>
+                            <tr valign="top">
+                                <th colspan="2" scope="row">
+                                    <h3>
+                                        Registration Form
+                                    </h3> 
+                                </th>
+                            </tr>
+                            <tr valign="top">
+                                <th scope="row">
+                                    <label for="herc_recaptcha_options[registration_form]">
+                                        Show on Registration Form
+                                    </label>
+                                </th>
+                                <td>
+                                    <input type="hidden" name="herc_recaptcha_options[registration_form]" value="false" />
+                                    <input type="checkbox" name="herc_recaptcha_options[registration_form]" value="true" <?php echo $this->registration_form == 'false' ? '' : 'checked="checked"'; ?> />
                                 </td>
                             </tr>
                             <tr valign="top">
@@ -206,11 +242,13 @@ License URI: http://www.gnu.org/licenses/gpl-3.0.html
             $privatekey = $herc_recaptcha_options['private_key'];
             $placement  = !empty( $herc_recaptcha_options['placement'] ) ? $herc_recaptcha_options['placement'] : 'comment_form_after_fields';
             $style      = !empty( $herc_recaptcha_options['style'] ) ? $herc_recaptcha_options['style'] : 'dark';
+            $registration_form = !empty( $herc_recaptcha_options['registration_form'] ) ? $herc_recaptcha_options['registration_form'] : 'true';
 
             $this->public_recaptcha_key = $publickey;
             $this->private_recaptcha_key = $privatekey;
             $this->placement = $placement;
             $this->style = $style;
+            $this->registration_form = $registration_form;
         }
 
         /**
@@ -284,10 +322,10 @@ License URI: http://www.gnu.org/licenses/gpl-3.0.html
                 $gglcptch_options = $this->GetRecaptchaSettings();
 
                 $captcha_url = 'https://www.google.com/recaptcha/api/siteverify?secret=' . $this->private_recaptcha_key . '&response=' . $_POST['g-recaptcha-response'] . '&remoteip=' . $_SERVER['REMOTE_ADDR'];
-                if ($data = wp_remote_get($captcha_url))
+                if ( $data = wp_remote_get( $captcha_url ) )
                 {
-                    $obj = json_decode($data['body']);
-                    if ($obj->success)
+                    $obj = json_decode( $data['body'] );
+                    if ( $obj->success )
                     {
                         return $commentdata;
                     }
@@ -304,6 +342,58 @@ License URI: http://www.gnu.org/licenses/gpl-3.0.html
                     wp_die(__('Can\'t return the captcha repsonse.'));
                 }
             }
+        }
+        
+        function VerifyRegistrationRecaptcha( $registrationdata )
+        {
+            if( is_user_logged_in() || empty( $this->public_recaptcha_key ) || empty( $this->private_recaptcha_key ) )
+                return $registrationdata;
+
+            if (empty($_POST['g-recaptcha-response']))
+            {
+                $registrationdata['errors']->add( 'blank_captcha', '<strong>You must check the Recaptcha</strong>' );
+                return $registrationdata;
+            }
+            else
+            {
+                /* Get Recaptcha keys to use */
+                $gglcptch_options = $this->GetRecaptchaSettings();
+
+                $captcha_url = 'https://www.google.com/recaptcha/api/siteverify?secret=' . $this->private_recaptcha_key . '&response=' . $_POST['g-recaptcha-response'] . '&remoteip=' . $_SERVER['REMOTE_ADDR'];
+                if ($data = wp_remote_get( $captcha_url ) )
+                {
+                    $obj = json_decode($data['body']);
+                    if ($obj->success)
+                    {
+                        return $registrationdata;
+                    }
+                    else
+                    {
+                        
+                    }
+                }
+                else
+                {
+                    wp_die(__('Can\'t return the captcha repsonse.'));
+                }
+            }
+        }
+        
+        function RegistrationCaptcha()
+        {
+            if( $this->is_multi_blog() )
+            {
+                add_filter( 'wpmu_validate_user_signup', array( $this, 'VerifyRegistrationRecaptcha' ) );
+            }
+            else
+            {
+                add_filter( 'registration_errors', array( $this, 'VerifyRegistrationRecaptcha' ) );
+            }
+        }
+        
+        protected function is_multi_blog()
+        {
+            return is_multisite();
         }
     }
     
